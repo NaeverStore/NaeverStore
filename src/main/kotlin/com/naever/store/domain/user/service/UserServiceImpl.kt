@@ -4,11 +4,10 @@ import com.naever.store.domain.exception.InvalidCredentialException
 import com.naever.store.domain.exception.ModelNotFoundException
 import com.naever.store.domain.exception.UniqueAttributeValueAlreadyExistException
 import com.naever.store.domain.user.dto.*
-import com.naever.store.domain.user.model.PasswordHistory
-import com.naever.store.domain.user.repository.passwordHistory.PasswordHistoryRepository
 import com.naever.store.domain.user.repository.UserRepository
 import com.naever.store.infra.security.jwt.TokenProvider
 import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
@@ -19,7 +18,6 @@ class UserServiceImpl(
     private val userRepository: UserRepository,
     private val passwordEncoder: PasswordEncoder,
     private val tokenProvider: TokenProvider,
-    private val passwordHistoryRepository: PasswordHistoryRepository
 ): UserService {
     @Transactional
     override fun registerUser(userRegisterRequest: UserRegisterRequest): UserResponse {
@@ -27,7 +25,6 @@ class UserServiceImpl(
             throw UniqueAttributeValueAlreadyExistException("email", userRegisterRequest.email)
         if(userRegisterRequest.passwordConfirm != userRegisterRequest.password) throw InvalidCredentialException()
         val user = userRepository.save(userRegisterRequest.to(passwordEncoder))
-        passwordHistoryRepository.save(PasswordHistory(user, user.password))
         return UserResponse.from(user)
     }
 
@@ -51,11 +48,11 @@ class UserServiceImpl(
     override fun updatePassword(userId: Long, userPasswordUpdateRequest: UserPasswordUpdateRequest): UserResponse {
         val user = userRepository.findByIdOrNull(userId) ?: throw ModelNotFoundException("User", userId)
         if(!passwordEncoder.matches(userPasswordUpdateRequest.passwordConfirm, user.password)) throw InvalidCredentialException()
-        val list = passwordHistoryRepository.getPasswordHistory(userId)
+        val list = userRepository.findRevisions(userId).content
+            .toList().map{it.entity.password}.reversed().let { it.subList(0, it.size.coerceAtMost(3)) }
         if(list.find { passwordEncoder.matches(userPasswordUpdateRequest.newPassword, it)} != null)
             throw IllegalArgumentException("Already Used Password")
         user.updatePassword(passwordEncoder.encode(userPasswordUpdateRequest.newPassword))
-        passwordHistoryRepository.save(PasswordHistory(user, user.password))
         return UserResponse.from(userRepository.save(user))
     }
 }

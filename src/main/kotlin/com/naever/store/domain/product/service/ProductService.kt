@@ -7,14 +7,14 @@ import com.naever.store.domain.product.dto.ProductResponse
 
 interface ProductService {
 
-    fun registerProduct(userId: Long, request: ProductRequest): ProductResponse
-
     fun getProductList(pageNumber: Int, pageSize: Int, request: ProductPageRequest): ProductPageResponse
 
     fun getProductById(productId: Long): ProductResponse
 
-    fun updateProduct(userId: Long, productId: Long, request: ProductRequest): ProductResponse
+    fun registerProduct(storeId: Long, request: ProductRequest): ProductResponse
 
-    fun deleteProduct(userId: Long, productId: Long)
+    fun updateProduct(storeId: Long, productId: Long, request: ProductRequest): ProductResponse
+
+    fun deleteProduct(storeId: Long, productId: Long)
 
 }

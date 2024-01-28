@@ -14,4 +14,6 @@ interface IProductRepository {
 
     fun deleteProductById(id: Long)
 
+    fun deleteAllByStoreId(storeId: Long)
+
 }

@@ -35,7 +35,7 @@ class CartServiceImpl(
                     quantity = cartAddRequest.quantity
                 ))
         )
-        if(cart.quantity >= product.stock)
+        if(cart.quantity > product.stock)
             throw IllegalArgumentException("${product.itemName}을 ${cartAddRequest.quantity}만큼 넣을 수 없습니다.")
         return cart
     }

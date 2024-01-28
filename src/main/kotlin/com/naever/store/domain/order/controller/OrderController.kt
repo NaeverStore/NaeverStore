@@ -17,41 +17,47 @@ import org.springframework.web.bind.annotation.RestController
 
 @RestController
 @RequestMapping("/orders")
-class OrderController(private val orderItemService: OrderService) {
+class OrderController(private val orderService: OrderService) {
 
     @GetMapping
-    fun findAll(): ResponseEntity<List<OrderDetailResponse>> {
-        val orders = orderItemService.findAll()
-        return ResponseEntity.status(HttpStatus.OK).body(orderItemService.findAll())
+    fun findAllByUserId(
+        @AuthenticationPrincipal userPrincipal: UserPrincipal,
+    ): ResponseEntity<List<OrderDetailResponse>> {
+        val orders = orderService.findAllByUser(userPrincipal.id)
+        return ResponseEntity.status(HttpStatus.OK).body(orders)
     }
 
     @GetMapping("/{orderId}")
-    fun findById(@PathVariable orderId: Long): ResponseEntity<OrderDetailResponse> {
-        return ResponseEntity.status(HttpStatus.OK).body(orderItemService.findById(orderId))
+    fun findById(
+        @AuthenticationPrincipal userPrincipal: UserPrincipal,
+        @PathVariable orderId: Long): ResponseEntity<OrderDetailResponse> {
+        return ResponseEntity.status(HttpStatus.OK).body(orderService.findById(userPrincipal.id, orderId))
     }
-
-//    @PostMapping("/selectItem")
-//    fun selectItem(@RequestBody orderItemRequest: OrderItemRequest): ResponseEntity<SelectItemResponse> {
-//        return ResponseEntity.status(HttpStatus.CREATED).body(orderItemService.selectItem(orderItemRequest))
-//    }
 
     @PostMapping
     fun createOrder(
         @AuthenticationPrincipal userPrincipal: UserPrincipal,
         @RequestBody orderRequest: CreateOrderRequest
     ): ResponseEntity<OrderDetailResponse> {
-        return ResponseEntity.status(HttpStatus.CREATED).body(orderItemService.createOrder(userPrincipal.id, orderRequest))
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(orderService.createOrder(userPrincipal.id, orderRequest))
     }
 
     @PutMapping("/{orderId}")
-    fun updateOrder(@PathVariable orderId: Long, @RequestBody updateOrderRequest: UpdateOrderRequest): ResponseEntity<OrderDetailResponse> {
-        return ResponseEntity.status(HttpStatus.OK).body(orderItemService.updateOrder(orderId, updateOrderRequest))
+    fun updateOrder(
+        @AuthenticationPrincipal userPrincipal: UserPrincipal,
+        @PathVariable orderId: Long,
+        @RequestBody updateOrderRequest: UpdateOrderRequest): ResponseEntity<OrderDetailResponse> {
+        return ResponseEntity.status(HttpStatus.OK)
+            .body(orderService.updateOrder(userPrincipal.id, orderId, updateOrderRequest))
     }
 
     @DeleteMapping("/{orderId}")
-    fun deleteOrder(@PathVariable orderId: Long): ResponseEntity<Unit> {
-        orderItemService.deleteOrder(orderId)
-        return ResponseEntity.status(HttpStatus.NO_CONTENT).build()
+    fun deleteOrder(
+        @AuthenticationPrincipal userPrincipal: UserPrincipal,
+        @PathVariable orderId: Long): ResponseEntity<OrderDetailResponse> {
+        return ResponseEntity.status(HttpStatus.NO_CONTENT)
+            .body(orderService.deleteOrder(userPrincipal.id, orderId))
     }
 
 }

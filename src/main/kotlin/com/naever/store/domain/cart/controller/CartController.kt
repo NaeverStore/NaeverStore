@@ -30,7 +30,7 @@ class CartController(
     }
     @PreAuthorize("hasAuthority('ROLE_USER')")
     @DeleteMapping
-    fun deleteCartItem(@RequestPart(required = false) deleteItemsRequest: CartDeleteRequest?): ResponseEntity<Unit>
+    fun deleteCartItem(@RequestBody(required = false) deleteItemsRequest: CartDeleteRequest?): ResponseEntity<Unit>
     {
         return ResponseEntity.status(HttpStatus.NO_CONTENT)
             .body(cartService.deleteItemInCart(deleteItemsRequest))

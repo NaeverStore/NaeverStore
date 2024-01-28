@@ -3,9 +3,12 @@ package com.naever.store.domain.user.model
 import com.naever.store.common.BaseTimeEntity
 import com.naever.store.domain.user.dto.UserUpdateRequest
 import jakarta.persistence.*
+import org.hibernate.envers.Audited
+import org.hibernate.envers.NotAudited
 
 @Table(name = "app_user")
 @Entity
+@Audited
 data class User(
     @Column(name = "nickname")
     var nickname:String,

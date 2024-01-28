@@ -8,29 +8,15 @@ import com.naever.store.domain.product.dto.ProductRequest
 import com.naever.store.domain.product.dto.ProductResponse
 import com.naever.store.domain.product.model.Product
 import com.naever.store.domain.product.repository.IProductRepository
-import com.naever.store.domain.user.repository.UserRepository
-import org.springframework.data.repository.findByIdOrNull
+import com.naever.store.domain.store.service.StoreService
+import com.naever.store.infra.security.SecurityUtil
 import org.springframework.stereotype.Service
 
 @Service
 class ProductServiceImpl(
-    private val productRepository: IProductRepository, private val userRepository: UserRepository
+    private val productRepository: IProductRepository,
+    private val storeService: StoreService
 ) : ProductService {
-
-    override fun registerProduct(userId: Long, request: ProductRequest): ProductResponse {
-
-        val user = userRepository.findByIdOrNull(userId) ?: throw ModelNotFoundException("User", userId)
-
-        return Product(
-            itemName = request.itemName,
-            price = request.price,
-            stock = request.stock,
-            description = request.description,
-            user = user
-        ).let {
-            productRepository.save(it)
-        }.let { ProductResponse.from(it) }
-    }
 
     override fun getProductList(pageNumber: Int, pageSize: Int, request: ProductPageRequest): ProductPageResponse {
 
@@ -44,9 +30,24 @@ class ProductServiceImpl(
         return ProductResponse.from(product)
     }
 
-    override fun updateProduct(userId: Long, productId: Long, request: ProductRequest): ProductResponse {
+    override fun registerProduct(storeId: Long, request: ProductRequest): ProductResponse {
 
-        val product = getProductIfAuthorized(userId, productId)
+        val store = storeService.getStoreIfAuthorized(SecurityUtil.getLoginUserId(), storeId)
+
+        return Product(
+            itemName = request.itemName,
+            price = request.price,
+            stock = request.stock,
+            description = request.description,
+            store = store
+        ).let {
+            productRepository.save(it)
+        }.let { ProductResponse.from(it) }
+    }
+
+    override fun updateProduct(storeId: Long, productId: Long, request: ProductRequest): ProductResponse {
+
+        val product = getProductIfAuthorized(storeId, productId)
 
         product.updateProduct(request)
 
@@ -54,25 +55,23 @@ class ProductServiceImpl(
             .let { ProductResponse.from(it) }
     }
 
-    override fun deleteProduct(userId: Long, productId: Long) {
+    override fun deleteProduct(storeId: Long, productId: Long) {
 
-        val product = getProductIfAuthorized(userId, productId)
+        val product = getProductIfAuthorized(storeId, productId)
 
         product.deleteProduct()
 
         productRepository.save(product)
     }
 
-    private fun getProductIfAuthorized(userId: Long, productId: Long): Product {
+    private fun getProductIfAuthorized(storeId: Long, productId: Long): Product {
 
-        if (!userRepository.existsById(userId)) {
-            throw ModelNotFoundException("User", userId)
-        }
+        val store = storeService.getStoreIfAuthorized(SecurityUtil.getLoginUserId(), storeId)
 
         val product = productRepository.findProductById(productId) ?: throw ModelNotFoundException("Product", productId)
 
-        if (!product.matchUserId(userId)) {
-            throw ForbiddenException(userId, "Product", productId)
+        if (!product.matchStoreId(store.id!!)) {
+            throw ForbiddenException(SecurityUtil.getLoginUserId()!!, "Product", productId)
         }
 
         return product

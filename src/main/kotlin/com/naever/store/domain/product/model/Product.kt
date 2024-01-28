@@ -2,7 +2,7 @@ package com.naever.store.domain.product.model
 
 import com.naever.store.common.BaseTimeEntity
 import com.naever.store.domain.product.dto.ProductRequest
-import com.naever.store.domain.user.model.User
+import com.naever.store.domain.store.model.Store
 import jakarta.persistence.*
 import org.hibernate.annotations.SQLRestriction
 
@@ -30,8 +30,8 @@ class Product(
     var description: String,
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
-    val user: User
+    @JoinColumn(name = "store_id")
+    val store: Store
 
 ) : BaseTimeEntity() {
     init {
@@ -44,8 +44,8 @@ class Product(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null
 
-    fun matchUserId(requestUserId: Long): Boolean {
-        return user.id == requestUserId
+    fun matchStoreId(requestStoreId: Long): Boolean {
+        return store.id == requestStoreId
     }
 
     fun updateProduct(request: ProductRequest) {
@@ -57,10 +57,16 @@ class Product(
 
     fun order(quantity: Int) {
         if (stock - quantity < 0) {
-            throw IllegalStateException("out of stock")
+            throw IllegalStateException("$itemName (id: $id) out of stock")
         }
         stock -= quantity
         sales += quantity
+        changeAvailability()
+    }
+
+    fun cancelOrder(quantity: Int) {
+        stock += quantity
+        sales -= quantity
         changeAvailability()
     }
 

@@ -7,20 +7,21 @@ import jakarta.persistence.*
 @Entity
 @Table(name = "order_history") // 주문을 생성, 조회, 수정, 삭제할 때의 Entity입니다.
 class Order(
-    @Column
+    @Column(name = "address", nullable = false)
     var address: String,
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     val user: User,
 
-    @Column
-    // TODO : enum 을 만들어서 ORDERED, CANCELLED, DELIVERED 등을 넣어주면 좋을 것 같습니다ㅎㅎ
-    var status: String = "ORDERED",
+    @Column(name = "status", nullable = false)
+    @Enumerated(EnumType.STRING)
+    var status: OrderStatus = OrderStatus.ORDERED,
 
     ) : BaseTimeEntity() {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null
+
 }

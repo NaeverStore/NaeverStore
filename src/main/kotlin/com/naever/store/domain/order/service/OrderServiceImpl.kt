@@ -1,9 +1,12 @@
 package com.naever.store.domain.order.service
 
+import com.naever.store.domain.cart.repository.CartRepository
+import com.naever.store.domain.exception.ForbiddenException
 import com.naever.store.domain.exception.ModelNotFoundException
 import com.naever.store.domain.order.dto.*
 import com.naever.store.domain.order.model.OrderItem
 import com.naever.store.domain.order.model.Order
+import com.naever.store.domain.order.model.OrderStatus
 import com.naever.store.domain.order.repository.OrderRepository
 import com.naever.store.domain.order.repository.OrderItemRepository
 import com.naever.store.domain.product.repository.IProductRepository
@@ -17,20 +20,37 @@ class OrderServiceImpl(
     private val orderItemRepository: OrderItemRepository,
     private val orderRepository: OrderRepository,
     private val productRepository: IProductRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val cartRepository: CartRepository
 ) : OrderService {
 
-    override fun findAll(): List<OrderDetailResponse> {
-        val foundOrders = orderItemRepository.findAll()
-//        return foundOrders.map{ OrderDetailResponse.fromEntity(it) }
-        TODO()
+    override fun findAllByUser(userId: Long): List<OrderDetailResponse> {
+        val user = userRepository.findByIdOrNull(userId) ?: throw ModelNotFoundException("User", userId)
+        return orderRepository.findByUser(user).map { order ->
+            val orderItemsResponse = orderItemRepository.findByOrder(order).map { OrderItemResponse.fromEntity(it) }
+            OrderDetailResponse(
+                order = OrderResponse.fromEntity(order),
+                orderItems = orderItemsResponse
+            )
+        }
     }
 
-    override fun findById(orderId: Long): OrderDetailResponse {
-        val foundOrder = orderItemRepository.findByIdOrNull(orderId)
+    override fun findById(userId: Long, orderId: Long): OrderDetailResponse {
+        val user = userRepository.findByIdOrNull(userId)
+            ?: throw ModelNotFoundException("User", userId)
+        val foundOrder = orderRepository.findByIdOrNull(orderId)
             ?: throw ModelNotFoundException("Order", orderId)
-//        return OrderDetailResponse.fromEntity(foundOrder)
-        TODO()
+
+        if (userId != foundOrder.user.id) {
+            throw ForbiddenException(userId, "Order", orderId)
+        }
+
+        val orderItemResponse = orderItemRepository.findByOrder(foundOrder).map { OrderItemResponse.fromEntity(it) }
+        return OrderDetailResponse(
+            order = OrderResponse.fromEntity(foundOrder),
+            orderItems = orderItemResponse
+        )
+
     }
 
     @Transactional
@@ -45,45 +65,77 @@ class OrderServiceImpl(
             )
         )
 
-        val orderItems = ArrayList<OrderItemResponse>()
-        for (orderItemRequest in request.orderItems) {
+        val orderItems = request.orderItems.map {
 
-            val product = productRepository.findProductById(orderItemRequest.productId)
-                ?: throw ModelNotFoundException("Product", orderItemRequest.productId)
+            val product = productRepository.findProductById(it.productId)
+                ?: throw ModelNotFoundException("Product", it.productId)
 
-            product.order(orderItemRequest.quantity)
+            product.order(it.quantity)
 
-            orderItems.add(orderItemRepository.save(
+            orderItemRepository.save(
                 OrderItem(
                     order = order,
                     product = product,
-                    quantity = orderItemRequest.quantity
+                    quantity = it.quantity
                 )
             ).let {
                 OrderItemResponse.fromEntity(it)
-            })
+            }
         }
 
+        cartRepository.deleteItemsInCart(userId, request.orderItems.map { it.productId })
+
         return OrderDetailResponse(
-            order = OrderResponse.from(order),
+            order = OrderResponse.fromEntity(order),
             orderItems = orderItems
         )
     }
 
     @Transactional
-    override fun updateOrder(orderId: Long, request: UpdateOrderRequest): OrderDetailResponse {
-        val updatedOrder = orderItemRepository.findByIdOrNull(orderId) ?: throw ModelNotFoundException("Order", orderId)
+    override fun updateOrder(
+        userId: Long,
+        orderId: Long,
+        request: UpdateOrderRequest
+    ): OrderDetailResponse {
 
-//        updatedOrder.address = request.address
-//        updatedOrder.status = request.status
+        val order = orderRepository.findByIdOrNull(orderId) ?: throw ModelNotFoundException("Order", orderId)
 
-        val savedUpdatedOrder = orderItemRepository.save(updatedOrder)
-//        return OrderDetailResponse.fromEntity(savedUpdatedOrder)
-        TODO()
+        if (userId != order.user.id) {
+            throw ForbiddenException(userId, "Order", orderId)
+        }
+        order.address = request.address
+        val updatedOrder = orderRepository.save(order)
+
+        val orderItemsResponse = updatedOrder.let { order ->
+            orderItemRepository.findByOrder(order).map { OrderItemResponse.fromEntity(it) }
+        }
+        return OrderDetailResponse(
+            order = OrderResponse.fromEntity(updatedOrder),
+            orderItems = orderItemsResponse
+        )
     }
 
     @Transactional
-    override fun deleteOrder(orderId: Long) {
-        orderItemRepository.deleteById(orderId)
+    override fun deleteOrder(userId: Long, orderId: Long): OrderDetailResponse {
+        val order: Order = orderRepository.findByIdOrNull(orderId) ?: throw ModelNotFoundException("Order", orderId)
+
+        if (userId != order.user.id) {
+            throw ForbiddenException(userId, "Order", orderId)
+        }
+
+        order.status = OrderStatus.CANCELLED
+        orderRepository.save(order)
+
+        val orderItemsResponse = orderItemRepository.findByOrder(order).map {
+
+            it.product.cancelOrder(it.quantity)
+
+            OrderItemResponse.fromEntity(it)
+        }
+
+        return OrderDetailResponse(
+            order = OrderResponse.fromEntity(order),
+            orderItems = orderItemsResponse
+        )
     }
 }
